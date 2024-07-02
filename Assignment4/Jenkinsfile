@@ -1,0 +1,59 @@
+pipeline {
+    agent any
+    tools {
+        maven 'maven'
+    }
+    environment {
+        tomcat_url = 'http://13.200.222.161:8080'
+    }
+    stages {
+        stage('Code Checkout') {
+            steps {
+                git 'https://github.com/opstree/spring3hibernate.git'
+            }
+        }
+        stage('Parallel Tasks') {
+            parallel {
+                stage('Maven Test') {
+                    steps {
+                        sh 'mvn test'
+                    }
+                }
+            }
+        }
+        stage('Maven Verify') {
+            steps {
+                sh 'mvn verify'
+            }
+        }
+        stage('Code Coverage') {
+            steps {
+                sh 'mvn cobertura:cobertura'
+            }
+        }
+        stage('Dependency Check') {
+            steps {
+                sh 'mvn dependency-check:check'
+            }
+        }
+        stage('Create Artifacts') {
+            steps {
+                sh 'mvn package'
+                archiveArtifacts artifacts: 'target/*.war'
+            }
+        }
+          stage('Approval') {
+            steps {
+                // Wait for user input to approve or deny the publication
+                input message: 'Approve publication?', submitter: 'admin'
+            }
+        }
+        stage('Deploy to Tomcat') {
+            steps {
+                deploy adapters: [tomcat9(credentialsId: 'tomcat10', path: '', url: "${env.tomcat_url}")], contextPath: 'Spring3HibernateApp', war: '**/*.war'
+            }
+        }
+    }
+}
+
+
